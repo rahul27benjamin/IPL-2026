@@ -1,188 +1,162 @@
 import streamlit as st
 import pandas as pd
-from streamlit_gsheets import GSheetsConnection
+import json
+import os
 
 # --- Configuration ---
-# PASTE YOUR FULL GOOGLE SHEET URL HERE
-# Ensure "Anyone with the link" is an "Editor" in the Share settings
-# SHEET_URL = "https://docs.google.com/spreadsheets/d/1jbzcb-3qgMN0VCorXNxmNVnuNEd3X-XifCqPDwDoSZ8/edit"
 FAMILIES = ["Dhinakarans", "Davids", "Moses", "Benjamins"]
 TEAMS = ["CSK", "RCB", "MI", "GT", "DC", "SRH", "LSG", "RR", "PBKS", "KKR"]
+DATA_FILE = 'ipl_game_data.json'
+
+# --- 1. Data Logic ---
+def load_data():
+    default_structure = {
+        "scores": {f: 0 for f in FAMILIES}, 
+        "current_match": None, 
+        "team_selections": {f: "None" for f in FAMILIES}, 
+        "picks_locked": False,
+        "match_locked": False,
+        "history": [],
+        "last_win_msg": None 
+    }
+    if not os.path.exists(DATA_FILE):
+        return default_structure
+    with open(DATA_FILE, 'r') as f:
+        data = json.load(f)
+    for key, value in default_structure.items():
+        if key not in data: data[key] = value
+    return data
+
+def save_data(data):
+    with open(DATA_FILE, 'w') as f:
+        json.dump(data, f)
+
+# Initialize Session State (Using 'ipl_data' consistently)
+if 'ipl_data' not in st.session_state:
+    st.session_state.ipl_data = load_data()
+
+data = st.session_state.ipl_data
 
 st.set_page_config(page_title="Family IPL 2026", page_icon="🏏")
 st.title("🏏 Family IPL Leaderboard")
 
-# --- 1. Connection Logic ---
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-def get_data():
-    try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        s_df = conn.read(worksheet="Scores", ttl=0)
-        h_df = conn.read(worksheet="History", ttl=0)
-
-        # --- NEW CLEANING STEPS ---
-        # 1. Remove any completely empty rows
-        s_df = s_df.dropna(how="all")
-        
-        # 2. Strip spaces from column names and make them consistent
-        s_df.columns = [str(c).strip() for c in s_df.columns]
-        h_df.columns = [str(c).strip() for c in h_df.columns]
-        # --------------------------
-
-        return s_df, h_df
-    except Exception as e:
-        st.error(f"Logic error: {e}")
-        return pd.DataFrame(), pd.DataFrame()
-
-# Call the function
-scores_df, history_df = get_data()
-
-# Now the check on line 51 will work
-if not scores_df.empty:
-    # Check if 'Points' actually exists in the columns we just cleaned
-    if "Points" in scores_df.columns:
-        # Success! Display the table
-        display_df = scores_df.sort_values("Points", ascending=False).set_index("Family")
-        st.table(display_df)
-    else:
-        st.error(f"Column 'Points' not found. I see these columns instead: {list(scores_df.columns)}")
-else:
-    st.warning("The 'Scores' tab is empty. Add some family names and points to the sheet!")
-
-# Execute and Display
-st.title("🏆 Family IPL 2026 Standings")
-s_df, h_df = get_data()
-
-if s_df is not None:
-    st.dataframe(s_df, use_container_width=True)
-    st.success("Connection confirmed: Data is flowing!")
-scores_df, history_df = get_data()
-
-# --- 5. Standings & History (SAFE VERSION) ---
-st.divider()
-tab1, tab2 = st.tabs(["🏆 Standings", "📜 History"])
-
-with tab1:
-    if not scores_df.empty and "Points" in scores_df.columns:
-        # Sort and display
-        display_df = scores_df.sort_values("Points", ascending=False).set_index("Family")
-        st.table(display_df)
-    else:
-        st.warning("Waiting for data from Google Sheets... Check your 'Scores' tab headers.")
-
-with tab2:
-    if not history_df.empty:
-        st.dataframe(history_df.set_index("Match #"), use_container_width=True)
-    else:
-        st.info("No match history found in the Google Sheet.")
-
-scores_df, history_df = get_data()
-
-# Initialize Session State variables if not present
-if "current_match" not in st.session_state: st.session_state.current_match = None
-if "match_locked" not in st.session_state: st.session_state.match_locked = False
-if "picks_locked" not in st.session_state: st.session_state.picks_locked = False
-if "last_win_msg" not in st.session_state: st.session_state.last_win_msg = None
-if "team_selections" not in st.session_state: st.session_state.team_selections = {f: "None" for f in FAMILIES}
-
 # --- 2. Admin Sidebar ---
 with st.sidebar:
     st.header("⚙️ Admin Controls")
-    st.metric("Total Matches Played", len(history_df))
+    st.metric("Total Matches Played", len(data["history"]))
     
     if st.button("🆕 Start New Match Entry"):
-        st.session_state.current_match = {"team1": "CSK", "team2": "MI"}
-        st.session_state.match_locked = False
-        st.session_state.picks_locked = False
-        st.session_state.last_win_msg = None
-        st.session_state.team_selections = {f: "None" for f in FAMILIES}
+        st.session_state.ipl_data["current_match"] = {"team1": "CSK", "team2": "MI"} 
+        st.session_state.ipl_data["team_selections"] = {f: "None" for f in FAMILIES}
+        st.session_state.ipl_data["picks_locked"] = False
+        st.session_state.ipl_data["match_locked"] = False
+        st.session_state.ipl_data["last_win_msg"] = None 
+        save_data(st.session_state.ipl_data)
         st.rerun()
     
-    if st.session_state.picks_locked:
+    if data["picks_locked"]:
+        st.divider()
         if st.button("🔓 Unlock Family Picks"):
-            st.session_state.picks_locked = False
+            st.session_state.ipl_data["picks_locked"] = False
+            save_data(st.session_state.ipl_data)
             st.rerun()
 
-# --- 3. Victory Popup ---
-if st.session_state.last_win_msg:
+# --- 3. Persistent Victory Popup ---
+if data["last_win_msg"]:
     st.balloons()
-    st.success(st.session_state.last_win_msg)
+    st.success(data["last_win_msg"])
     if st.button("Clear & View Standings"):
-        st.session_state.last_win_msg = None
+        st.session_state.ipl_data["last_win_msg"] = None
+        save_data(st.session_state.ipl_data)
         st.rerun()
 
-# --- 4. Steps Section ---
-if st.session_state.current_match and not st.session_state.last_win_msg:
+# --- 4. Steps Section (Only shows if a match is active) ---
+if data["current_match"] is not None and data["last_win_msg"] is None:
+    
+    # --- Step 1: Set Matchup ---
     st.header("Step 1: Set Today's Match")
-    t1 = st.selectbox("Team 1", TEAMS, index=TEAMS.index(st.session_state.current_match["team1"]), disabled=st.session_state.match_locked)
-    t2 = st.selectbox("Team 2", TEAMS, index=TEAMS.index(st.session_state.current_match["team2"]), disabled=st.session_state.match_locked)
+    t1_input = st.selectbox("Team 1", TEAMS, index=TEAMS.index(data["current_match"]["team1"]), disabled=data["match_locked"])
+    t2_input = st.selectbox("Team 2", TEAMS, index=TEAMS.index(data["current_match"]["team2"]), disabled=data["match_locked"])
 
-    if not st.session_state.match_locked:
+    if not data["match_locked"]:
         if st.button("Confirm Matchup"):
-            st.session_state.current_match = {"team1": t1, "team2": t2}
-            st.session_state.match_locked = True
+            st.session_state.ipl_data["current_match"] = {"team1": t1_input, "team2": t2_input}
+            st.session_state.ipl_data["match_locked"] = True
+            save_data(st.session_state.ipl_data)
             st.rerun()
     else:
-        st.info(f"Match: **{t1} vs {t2}**")
-        if not st.session_state.picks_locked:
+        st.info(f"Confirmed Matchup: **{data['current_match']['team1']} vs {data['current_match']['team2']}**")
+        if not data["picks_locked"]:
             if st.button("✏️ Edit Matchup"):
-                st.session_state.match_locked = False
+                st.session_state.ipl_data["match_locked"] = False
+                save_data(st.session_state.ipl_data)
                 st.rerun()
 
-    if st.session_state.match_locked:
+    # --- Step 2: Family Selection ---
+    if data["match_locked"]:
         st.divider()
-        st.header("Step 2: Family Picks")
+        t1_n, t2_n = data["current_match"]["team1"], data["current_match"]["team2"]
+        st.header(f"Step 2: {t1_n} vs {t2_n}")
+        
+        match_options = [t1_n, t2_n]
         cols = st.columns(4)
-        match_options = [t1, t2]
         for i, family in enumerate(FAMILIES):
             with cols[i]:
-                st.session_state.team_selections[family] = st.radio(
-                    f"**{family}**", match_options, 
-                    disabled=st.session_state.picks_locked, key=f"r_{family}"
+                current_val = data["team_selections"][family]
+                start_idx = match_options.index(current_val) if current_val in match_options else 0
+                data["team_selections"][family] = st.radio(
+                    f"**{family}**", match_options, index=start_idx, 
+                    disabled=data["picks_locked"], key=f"radio_{family}"
                 )
 
-        if not st.session_state.picks_locked:
-            if st.button("🔒 Lock All Picks"):
-                st.session_state.picks_locked = True
+        if not data["picks_locked"]:
+            if st.button("🔒 Finalize & Lock Picks"):
+                st.session_state.ipl_data["picks_locked"] = True
+                save_data(st.session_state.ipl_data) # Fixed the typo here
                 st.rerun()
-        
-        if st.session_state.picks_locked:
+
+        # --- Step 3: Results ---
+        if data["picks_locked"]:
             st.divider()
             st.header("Step 3: Award Points")
-            winner = st.selectbox("Who won?", ["Select Winner"] + match_options)
+            winner = st.selectbox("Who won?", ["Select Winner", t1_n, t2_n])
+            
             if st.button("Submit Result"):
                 if winner != "Select Winner":
-                    winners = [f for f, t in st.session_state.team_selections.items() if t == winner]
-                    pts = 4 if len(winners)==1 else (1 if len(winners)==4 else (2 if len(winners)>0 else 0))
+                    winners_list = [f for f, t in data["team_selections"].items() if t == winner]
+                    count = len(winners_list)
+                    pts = 4 if count == 1 else (1 if count == 4 else (2 if count > 0 else 0))
                     
-                    # Update Scores in DataFrame
-                    for f in winners:
-                        scores_df.loc[scores_df['Family'] == f, 'Points'] += pts
+                    if count > 0:
+                        for f in winners_list: st.session_state.ipl_data["scores"][f] += pts
                     
-                    # Update History
-                    new_row = pd.DataFrame([{
-                        "Match #": len(history_df) + 1,
-                        "Matchup": f"{t1} vs {t2}",
+                    st.session_state.ipl_data["history"].append({
+                        "Match #": len(data["history"]) + 1,
+                        "Matchup": f"{t1_n} vs {t2_n}",
                         "Winner": winner,
-                        "Winners": ", ".join(winners),
+                        "Winners": ", ".join(winners_list),
                         "Pts": pts
-                    }])
-                    updated_history = pd.concat([history_df, new_row], ignore_index=True)
+                    })
                     
-                    # WRITE TO GOOGLE SHEETS
-                    conn.update(spreadsheet=SHEET_URL, worksheet="Scores", data=scores_df)
-                    conn.update(spreadsheet=SHEET_URL, worksheet="History", data=updated_history)
+                    st.session_state.ipl_data["last_win_msg"] = f"🎉 {winner} Victory! {', '.join(winners_list)} earned {pts} points each."
+                    st.session_state.ipl_data["current_match"] = None
+                    st.session_state.ipl_data["picks_locked"] = False
+                    st.session_state.ipl_data["match_locked"] = False
                     
-                    st.session_state.last_win_msg = f"🎉 {winner} Won! {', '.join(winners)} get {pts} pts."
-                    st.session_state.current_match = None
+                    save_data(st.session_state.ipl_data)
                     st.rerun()
 
-# --- 5. Standings & History ---
+# --- 5. Leaderboard & History Tabs ---
 st.divider()
 tab1, tab2 = st.tabs(["🏆 Standings", "📜 History"])
 with tab1:
-    st.table(scores_df.sort_values("Points", ascending=False).set_index("Family"))
+    df = pd.DataFrame([{"Family": f, "Points": data["scores"][f]} for f in FAMILIES]).sort_values("Points", ascending=False)
+    df.index = range(1, len(df) + 1)
+    st.table(df)
 with tab2:
-    if not history_df.empty:
-        st.dataframe(history_df.set_index("Match #"), use_container_width=True)
+    if data["history"]:
+        h_df = pd.DataFrame(data["history"])
+        h_df.set_index("Match #", inplace=True)
+        st.dataframe(h_df, use_container_width=True)
+    else:
+        st.info("No history yet. Start a new match in the sidebar!")
