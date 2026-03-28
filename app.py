@@ -3,6 +3,58 @@ import pandas as pd
 import json
 import os
 
+import streamlit as st
+import pandas as pd
+import json
+import os
+
+def load_ipl_data():
+    # Path to your JSON file in the GitHub repo
+    json_path = 'history.json'
+    
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+            
+            # Convert list of dictionaries to a DataFrame
+            df = pd.DataFrame(data)
+            
+            # Data Type Calibration (Ensure points are numbers for sorting)
+            if not df.empty and "Pts" in df.columns:
+                df["Pts"] = pd.to_numeric(df["Pts"])
+            
+            return df
+        except Exception as e:
+            st.error(f"Error parsing JSON: {e}")
+            return pd.DataFrame()
+    else:
+        # Fallback if file is missing during first deployment
+        st.warning("history.json not found. Displaying empty table.")
+        return pd.DataFrame(columns=["Match #", "Matchup", "Winner", "Winners", "Pts"])
+
+# --- App Display ---
+st.title("🏆 Family IPL 2026")
+
+history_df = load_ipl_data()
+
+if not history_df.empty:
+    st.subheader("📜 Match History")
+    # Display the history table
+    st.table(history_df)
+    
+    # Logic for Standings: Calculate total points per winner
+    # This creates the 'Leaderboard' dynamically from the history!
+    st.subheader("📊 Current Standings")
+    
+    # We split 'Winners' by comma, explode them into rows, and sum their 'Pts'
+    standings = history_df.copy()
+    standings['Winners'] = standings['Winners'].str.split(', ')
+    standings = standings.explode('Winners')
+    leaderboard = standings.groupby('Winners')['Pts'].sum().sort_values(ascending=False)
+    
+    st.dataframe(leaderboard, use_container_width=True)
+
 # --- Configuration ---
 FAMILIES = ["Dhinakarans", "Davids", "Moses", "Benjamins"]
 TEAMS = ["CSK", "RCB", "MI", "GT", "DC", "SRH", "LSG", "RR", "PBKS", "KKR"]
