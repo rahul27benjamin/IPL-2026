@@ -17,22 +17,33 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
     try:
-        # 1. Establish the handshake
+        # Initialize the connection using your Secrets
         conn = st.connection("gsheets", type=GSheetsConnection)
         
-        # 2. Pull the actual data frames
-        # We use .read() to turn that <Response 200> into a Table
+        # CRITICAL CHANGE: We use .read() and ensure it returns a DataFrame
+        # If your tab names are exactly "Scores" and "History"
         s_df = conn.read(worksheet="Scores", ttl=0)
         h_df = conn.read(worksheet="History", ttl=0)
         
-        # 3. Clean any empty rows (common in Google Sheets)
-        s_df = s_df.dropna(how="all")
-        h_df = h_df.dropna(how="all")
-        
+        # Diagnostic check to ensure we have a table
+        if s_df is not None and not isinstance(s_df, pd.DataFrame):
+            st.error("Data received but not in table format. Checking headers...")
+            
         return s_df, h_df
     except Exception as e:
-        st.error(f"Almost there! Logic error: {e}")
-        return None, None
+        # This will now show the actual text of the error
+        st.error(f"Logic error: {e}")
+        return pd.DataFrame(), pd.DataFrame()
+
+# Call the function
+scores_df, history_df = get_data()
+
+# Now the check on line 51 will work
+if not scores_df.empty:
+    st.success("Data loaded successfully!")
+    st.dataframe(scores_df)
+else:
+    st.warning("Connected, but the 'Scores' tab appears to be empty.")
 
 # Execute and Display
 st.title("🏆 Family IPL 2026 Standings")
