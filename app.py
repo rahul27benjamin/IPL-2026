@@ -5,7 +5,7 @@ from streamlit_gsheets import GSheetsConnection
 # --- Configuration ---
 # PASTE YOUR FULL GOOGLE SHEET URL HERE
 # Ensure "Anyone with the link" is an "Editor" in the Share settings
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1jbzcb-3qgMN0VCorXNxmNVnuNEd3X-XifCqPDwDoSZ8/edit"
+# SHEET_URL = "https://docs.google.com/spreadsheets/d/1jbzcb-3qgMN0VCorXNxmNVnuNEd3X-XifCqPDwDoSZ8/edit"
 FAMILIES = ["Family A", "Family B", "Family C", "Family D"]
 TEAMS = ["CSK", "RCB", "MI", "GT", "DC", "SRH", "LSG", "RR", "PBKS", "KKR"]
 
@@ -18,8 +18,8 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def get_data():
     try:
         # Use a short TTL for development, then 0 for live
-        s_df = conn.read(spreadsheet=SHEET_URL, worksheet="Scores", ttl=0)
-        h_df = conn.read(spreadsheet=SHEET_URL, worksheet="History", ttl=0)
+        s_df = conn.read(worksheet="Scores", ttl=0)
+        h_df = conn.read(worksheet="History", ttl=0)
         return s_df, h_df
     except Exception as e:
         st.error(f"⚠️ Connection Error: {e}")
