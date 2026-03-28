@@ -5,7 +5,7 @@ from streamlit_gsheets import GSheetsConnection
 # --- Configuration ---
 # PASTE YOUR FULL GOOGLE SHEET URL HERE
 # Ensure "Anyone with the link" is an "Editor" in the Share settings
-SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1jbzcb-3qgMN0VCorXNxmNVnuNEd3X-XifCqPDwDoSZ8/edit"
 FAMILIES = ["Family A", "Family B", "Family C", "Family D"]
 TEAMS = ["CSK", "RCB", "MI", "GT", "DC", "SRH", "LSG", "RR", "PBKS", "KKR"]
 
