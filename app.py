@@ -17,12 +17,36 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
     try:
-        s_df = conn.read(spreadsheet=SHEET_URL, worksheet="Scores", ttl="0")
-        h_df = conn.read(spreadsheet=SHEET_URL, worksheet="History", ttl="0")
+        # Use a short TTL for development, then 0 for live
+        s_df = conn.read(spreadsheet=SHEET_URL, worksheet="Scores", ttl=0)
+        h_df = conn.read(spreadsheet=SHEET_URL, worksheet="History", ttl=0)
         return s_df, h_df
     except Exception as e:
-        st.error(f"Connection Error: {e}")
-        return pd.DataFrame(), pd.DataFrame()
+        st.error(f"⚠️ Connection Error: {e}")
+        # Create empty dataframes so the rest of the app doesn't crash
+        s_empty = pd.DataFrame(columns=["Family", "Points"])
+        h_empty = pd.DataFrame(columns=["Match #", "Matchup", "Winner", "Winners", "Pts"])
+        return s_empty, h_empty
+
+scores_df, history_df = get_data()
+
+# --- 5. Standings & History (SAFE VERSION) ---
+st.divider()
+tab1, tab2 = st.tabs(["🏆 Standings", "📜 History"])
+
+with tab1:
+    if not scores_df.empty and "Points" in scores_df.columns:
+        # Sort and display
+        display_df = scores_df.sort_values("Points", ascending=False).set_index("Family")
+        st.table(display_df)
+    else:
+        st.warning("Waiting for data from Google Sheets... Check your 'Scores' tab headers.")
+
+with tab2:
+    if not history_df.empty:
+        st.dataframe(history_df.set_index("Match #"), use_container_width=True)
+    else:
+        st.info("No match history found in the Google Sheet.")
 
 scores_df, history_df = get_data()
 
