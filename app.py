@@ -6,7 +6,7 @@ from streamlit_gsheets import GSheetsConnection
 # PASTE YOUR FULL GOOGLE SHEET URL HERE
 # Ensure "Anyone with the link" is an "Editor" in the Share settings
 # SHEET_URL = "https://docs.google.com/spreadsheets/d/1jbzcb-3qgMN0VCorXNxmNVnuNEd3X-XifCqPDwDoSZ8/edit"
-FAMILIES = ["Family A", "Family B", "Family C", "Family D"]
+FAMILIES = ["Dhinakarans", "Davids", "Moses", "Benjamins"]
 TEAMS = ["CSK", "RCB", "MI", "GT", "DC", "SRH", "LSG", "RR", "PBKS", "KKR"]
 
 st.set_page_config(page_title="Family IPL 2026", page_icon="🏏")
