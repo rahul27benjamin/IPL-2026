@@ -1,0 +1,74 @@
+import streamlit as st
+import pandas as pd
+import json
+import os
+
+# App Title
+st.title("🏏 Family IPL 2026 Leaderboard")
+
+# 1. Setup Data
+FAMILIES = ["Family A", "Family B", "Family C", "Family D"]
+TEAMS = ["CSK", "RCB", "MI", "GT", "DC", "SRH", "LSG", "RR", "PBKS", "KKR"]
+
+# Initialize or Load Scores
+if not os.path.exists('scores.json'):
+    initial_data = {f: {"team": "None", "points": 0} for f in FAMILIES}
+    with open('scores.json', 'w') as f:
+        json.dump(initial_data, f)
+
+with open('scores.json', 'r') as f:
+    data = json.load(f)
+
+# 2. Sidebar: Assign Teams
+st.sidebar.header("Team Selection")
+for family in FAMILIES:
+    current_team = data[family]["team"]
+    new_team = st.sidebar.selectbox(f"Select team for {family}", TEAMS, 
+                                     index=TEAMS.index(current_team) if current_team in TEAMS else 0,
+                                     key=f"select_{family}")
+    data[family]["team"] = new_team
+
+# 3. Main UI: Log a Win
+st.subheader("Log Match Result")
+winner = st.selectbox("Which team won today?", ["Select Team"] + TEAMS)
+
+if st.button("Update Scores"):
+    if winner != "Select Team":
+        # Logic for Exception Rules
+        # Find how many families chose this winning team
+        winning_families = [f for f, info in data.items() if info["team"] == winner]
+        count = len(winning_families)
+        
+        points_to_award = 0
+        if count == 1:
+            points_to_award = 4  # Rule 1: Lone winner gets 4
+        elif count == 4:
+            points_to_award = 1  # Rule 2: Everyone wins, everyone gets 1
+        elif 1 < count < 4:
+            points_to_award = 2  # Standard Rule: 2 points each
+            
+        if count > 0:
+            for family in winning_families:
+                data[family]["points"] += points_to_award
+            
+            st.success(f"Winning team: {winner}. {count} family(ies) awarded {points_to_award} points!")
+            
+            with open('scores.json', 'w') as f:
+                json.dump(data, f)
+        else:
+            st.info(f"No family chose {winner}. No points awarded.")
+    else:
+        st.warning("Please select a winning team.")
+
+# 4. Display Leaderboard
+st.divider()
+df = pd.DataFrame.from_dict(data, orient='index').reset_index()
+df.columns = ["Family", "Current IPL Team", "Total Points"]
+
+# Styling and Sorting
+st.table(df.sort_values(by="Total Points", ascending=False))
+
+# 5. Quick Schedule Reference (Upcoming)
+with st.expander("See Upcoming Matches"):
+    st.write("**Mar 29:** MI vs KKR (7:30 PM)")
+    st.write("**Mar 30:** RR vs CSK (7:30 PM)")
