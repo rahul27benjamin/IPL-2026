@@ -17,17 +17,30 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
     try:
-        # Use a short TTL for development, then 0 for live
+        # 1. Establish the handshake
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        
+        # 2. Pull the actual data frames
+        # We use .read() to turn that <Response 200> into a Table
         s_df = conn.read(worksheet="Scores", ttl=0)
         h_df = conn.read(worksheet="History", ttl=0)
+        
+        # 3. Clean any empty rows (common in Google Sheets)
+        s_df = s_df.dropna(how="all")
+        h_df = h_df.dropna(how="all")
+        
         return s_df, h_df
     except Exception as e:
-        st.error(f"⚠️ Connection Error: {e}")
-        # Create empty dataframes so the rest of the app doesn't crash
-        s_empty = pd.DataFrame(columns=["Family", "Points"])
-        h_empty = pd.DataFrame(columns=["Match #", "Matchup", "Winner", "Winners", "Pts"])
-        return s_empty, h_empty
+        st.error(f"Almost there! Logic error: {e}")
+        return None, None
 
+# Execute and Display
+st.title("🏆 Family IPL 2026 Standings")
+s_df, h_df = get_data()
+
+if s_df is not None:
+    st.dataframe(s_df, use_container_width=True)
+    st.success("Connection confirmed: Data is flowing!")
 scores_df, history_df = get_data()
 
 # --- 5. Standings & History (SAFE VERSION) ---
