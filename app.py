@@ -22,11 +22,13 @@ def get_data():
         h_df = conn.read(worksheet="History", ttl=0)
         return s_df, h_df
     except Exception as e:
-        st.error(f"⚠️ Connection Error: {e}")
-        # Create empty dataframes so the rest of the app doesn't crash
-        s_empty = pd.DataFrame(columns=["Family", "Points"])
-        h_empty = pd.DataFrame(columns=["Match #", "Matchup", "Winner", "Winners", "Pts"])
-        return s_empty, h_empty
+        # THIS IS THE IMPORTANT PART: It will show the REAL error on your screen
+        st.error(f"❌ Actual Google Error: {e}")
+        
+        # Create empty data so the rest of the app doesn't crash
+        s_err = pd.DataFrame(columns=["Family", "Points"])
+        h_err = pd.DataFrame(columns=["Match #", "Matchup", "Winner", "Winners", "Pts"])
+        return s_err, h_err
 
 scores_df, history_df = get_data()
 
