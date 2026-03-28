@@ -17,21 +17,21 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 def get_data():
     try:
-        # Initialize the connection using your Secrets
         conn = st.connection("gsheets", type=GSheetsConnection)
-        
-        # CRITICAL CHANGE: We use .read() and ensure it returns a DataFrame
-        # If your tab names are exactly "Scores" and "History"
         s_df = conn.read(worksheet="Scores", ttl=0)
         h_df = conn.read(worksheet="History", ttl=0)
+
+        # --- NEW CLEANING STEPS ---
+        # 1. Remove any completely empty rows
+        s_df = s_df.dropna(how="all")
         
-        # Diagnostic check to ensure we have a table
-        if s_df is not None and not isinstance(s_df, pd.DataFrame):
-            st.error("Data received but not in table format. Checking headers...")
-            
+        # 2. Strip spaces from column names and make them consistent
+        s_df.columns = [str(c).strip() for c in s_df.columns]
+        h_df.columns = [str(c).strip() for c in h_df.columns]
+        # --------------------------
+
         return s_df, h_df
     except Exception as e:
-        # This will now show the actual text of the error
         st.error(f"Logic error: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
@@ -40,10 +40,15 @@ scores_df, history_df = get_data()
 
 # Now the check on line 51 will work
 if not scores_df.empty:
-    st.success("Data loaded successfully!")
-    st.dataframe(scores_df)
+    # Check if 'Points' actually exists in the columns we just cleaned
+    if "Points" in scores_df.columns:
+        # Success! Display the table
+        display_df = scores_df.sort_values("Points", ascending=False).set_index("Family")
+        st.table(display_df)
+    else:
+        st.error(f"Column 'Points' not found. I see these columns instead: {list(scores_df.columns)}")
 else:
-    st.warning("Connected, but the 'Scores' tab appears to be empty.")
+    st.warning("The 'Scores' tab is empty. Add some family names and points to the sheet!")
 
 # Execute and Display
 st.title("🏆 Family IPL 2026 Standings")
